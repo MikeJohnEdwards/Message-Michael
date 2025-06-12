@@ -7,219 +7,40 @@
     body {
       font-family: 'Segoe UI', sans-serif;
       background: #f4f4f4;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 0;
       padding: 2rem;
+      text-align: center;
     }
-    h1 {
-      color: #333;
-    }
-    form {
-      margin: 1rem 0;
-      display: flex;
-      flex-direction: column;
+    form, textarea, button {
+      margin: 1rem auto;
+      display: block;
       width: 300px;
     }
-    input, button, textarea {
-      margin: 0.3rem 0;
-      padding: 0.5rem;
-      font-size: 1rem;
-    }
     #messages {
-      width: 100%;
       max-width: 600px;
-      background: white;
-      padding: 1rem;
-      border-radius: 10px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
-      margin-top: 1rem;
-      overflow-y: auto;
-      max-height: 300px;
-    }
-    #logoutBtn {
-      margin-top: 1rem;
+      margin: 1rem auto;
+      text-align: left;
     }
   </style>
 </head>
 <body>
   <h1>Send Michael a message! 😄</h1>
-  <p style="font-size: 1.5rem; color: #888; margin-top: -10px; margin-bottom: 20px;">
-    To sign up, please enter a username and password, you will then be directed to the messaging
-  </p>
-  <p style="font-size: 1.3rem; color: #888; margin-top: -10px; margin-bottom: 20px;">
-    The username and password are not secure, so don't use anything real 
-  </p>
+  <form id="authForm">
+    <input type="text" id="username" placeholder="Username" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button type="button" id="registerBtn">Register</button>
+    <button type="button" id="loginBtn">Login</button>
+  </form>
 
-  <div id="auth-section">
-    <h2>Register / Login</h2>
-    <form id="authForm" onsubmit="return false;">
-      <input type="text" id="username" placeholder="Username" required />
-      <input type="password" id="password" placeholder="Password" required />
-      <button type="button" id="registerBtn">Register</button>
-      <button type="button" id="loginBtn">Login</button>
-    </form>
-  </div>
-
-  <div id="app-section" style="display:none;">
+  <div id="app" style="display:none;">
     <h2 id="welcome"></h2>
     <form id="messageForm">
       <textarea id="messageText" placeholder="Type a message..." required></textarea>
-      <button type="submit">Send Message</button>
+      <button type="submit">Send</button>
     </form>
     <button id="logoutBtn">Logout</button>
     <div id="messages" style="display:none;"></div>
   </div>
 
-  <script>
-    const ADMIN = "admin";
-
-    const authForm = document.getElementById("authForm");
-    const messageForm = document.getElementById("messageForm");
-    const usernameInput = document.getElementById("username");
-    const passwordInput = document.getElementById("password");
-    const registerBtn = document.getElementById("registerBtn");
-    const loginBtn = document.getElementById("loginBtn");
-    const messageText = document.getElementById("messageText");
-    const welcome = document.getElementById("welcome");
-    const authSection = document.getElementById("auth-section");
-    const appSection = document.getElementById("app-section");
-    const messagesDiv = document.getElementById("messages");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    let currentUser = null;
-
-    registerBtn.onclick = async () => {
-      const username = usernameInput.value.trim();
-      const password = passwordInput.value.trim();
-      if (!username || !password) {
-        alert("Please enter both a username and password.");
-        return;
-      }
-      try {
-        const res = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        alert("Registered successfully. Please log in.");
-        usernameInput.value = "";
-        passwordInput.value = "";
-      } catch (err) {
-        alert("Registration failed: " + err.message);
-      }
-    };
-
-    loginBtn.onclick = async () => {
-      const username = usernameInput.value.trim();
-      const password = passwordInput.value.trim();
-      if (!username || !password) {
-        alert("Please enter both a username and password.");
-        return;
-      }
-      try {
-        const res = await fetch("/api/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        currentUser = username;
-        usernameInput.value = "";
-        passwordInput.value = "";
-        showApp();
-      } catch (err) {
-        alert("Login failed: " + err.message);
-      }
-    };
-
-    logoutBtn.onclick = () => {
-      currentUser = null;
-      showLogin();
-    };
-
-    messageForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const text = messageText.value.trim();
-      if (!text) return;
-
-      try {
-        const res = await fetch("/api/message", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ from: currentUser, text }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        messageText.value = "";
-        if (currentUser === ADMIN) {
-          await renderMessages();
-        }
-      } catch (err) {
-        alert("Failed to send message: " + err.message);
-      }
-    };
-
-    async function showApp() {
-      authSection.style.display = "none";
-      appSection.style.display = "block";
-      welcome.textContent = `Welcome, ${currentUser}!`;
-      if (currentUser === ADMIN) {
-        messagesDiv.style.display = "block";
-        await renderMessages();
-        // Poll for new messages every 5 seconds
-        if (!window.messagePoller) {
-          window.messagePoller = setInterval(renderMessages, 5000);
-        }
-      } else {
-        messagesDiv.style.display = "none";
-        if (window.messagePoller) {
-          clearInterval(window.messagePoller);
-          window.messagePoller = null;
-        }
-      }
-    }
-
-    function showLogin() {
-      appSection.style.display = "none";
-      authSection.style.display = "block";
-      if (window.messagePoller) {
-        clearInterval(window.messagePoller);
-        window.messagePoller = null;
-      }
-    }
-
-    async function renderMessages() {
-      try {
-        const res = await fetch(`/api/messages?user=${ADMIN}`);
-        if (!res.ok) throw new Error("Access denied or server error");
-        const data = await res.json();
-        messagesDiv.innerHTML =
-          "<h3>All Messages</h3>" +
-          data.messages
-            .map(
-              (m) =>
-                `<p><strong>${m.from}:</strong> ${escapeHtml(m.text)}</p>`
-            )
-            .join("");
-      } catch (err) {
-        messagesDiv.innerHTML = "<p>Error loading messages.</p>";
-      }
-    }
-
-    // Simple escape function to prevent HTML injection
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // Start on login screen
-    showLogin();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
