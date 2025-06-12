@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Secure Message Portal</title>
+  <title>Secure Messaging</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -35,30 +35,31 @@
       border-radius: 10px;
       box-shadow: 0 0 8px rgba(0,0,0,0.1);
       margin-top: 1rem;
-      overflow-y: auto;
+      display: none;
       max-height: 300px;
+      overflow-y: auto;
     }
     #logoutBtn {
       margin-top: 1rem;
     }
+    .not-secure-note {
+      font-size: 0.9rem;
+      color: #888;
+      margin-top: -10px;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>Send Michael a message! 😄</h1>
-  <p style="font-size: 1.5rem; color: #888; margin-top: -10px; margin-bottom: 20px;">
-    To sign up, please enter a username and password, you will then be directed to the messaging
-  </p>
-  <p style="font-size: 1.3rem; color: #888; margin-top: -10px; margin-bottom: 20px;">
-    The username and password are not secure, so don't use anything real 
-  </p>
+  <h1>Secure Messaging</h1>
+  <p class="not-secure-note">Not secure – for demo purposes only</p>
 
   <div id="auth-section">
     <h2>Register / Login</h2>
-    <form id="authForm" onsubmit="return false;">
-      <input type="text" id="username" placeholder="Username" required />
-      <input type="password" id="password" placeholder="Password" required />
-      <button type="button" id="registerBtn">Register</button>
-      <button type="button" id="loginBtn">Login</button>
+    <form id="authForm">
+      <input type="text" id="username" placeholder="Username" required autocomplete="off" />
+      <input type="password" id="password" placeholder="Password" required autocomplete="off" />
+      <button type="submit">Login / Register</button>
     </form>
   </div>
 
@@ -69,156 +70,112 @@
       <button type="submit">Send Message</button>
     </form>
     <button id="logoutBtn">Logout</button>
-    <div id="messages" style="display:none;"></div>
+    <div id="messages"></div>
   </div>
 
   <script>
-    const BACKEND_URL = 'https://message-michael-1.onrender.com'; // Your Render backend URL
     const ADMIN = 'admin';
 
+    // Load stored data or empty if none
+    const users = JSON.parse(localStorage.getItem('users')) || {};
+    const messages = JSON.parse(localStorage.getItem('messages')) || [];
+
+    // DOM elements
+    const authForm = document.getElementById('authForm');
+    const messageForm = document.getElementById('messageForm');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
-    const registerBtn = document.getElementById('registerBtn');
-    const loginBtn = document.getElementById('loginBtn');
     const messageText = document.getElementById('messageText');
     const welcome = document.getElementById('welcome');
     const authSection = document.getElementById('auth-section');
     const appSection = document.getElementById('app-section');
     const messagesDiv = document.getElementById('messages');
     const logoutBtn = document.getElementById('logoutBtn');
-    const messageForm = document.getElementById('messageForm');
 
     let currentUser = null;
 
-    registerBtn.onclick = async () => {
+    // Register/login handler
+    authForm.onsubmit = (e) => {
+      e.preventDefault();
       const username = usernameInput.value.trim();
       const password = passwordInput.value.trim();
 
-      if (!username || !password) {
-        alert("Please enter both a username and password.");
-        return;
-      }
-
-      try {
-        const res = await fetch(BACKEND_URL + '/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || "Registration failed");
+      if (!users[username]) {
+        // Register new user
+        users[username] = btoa(password); // simple encoding, not secure
+        localStorage.setItem('users', JSON.stringify(users));
+        alert(`User '${username}' registered successfully.`);
+      } else {
+        // Check password
+        if (users[username] !== btoa(password)) {
+          alert("Incorrect password.");
           return;
         }
-
-        alert("Registered successfully. Please log in.");
-        usernameInput.value = '';
-        passwordInput.value = '';
-      } catch (error) {
-        alert("Failed to register. Try again later.");
-        console.error(error);
       }
+
+      currentUser = username;
+      usernameInput.value = '';
+      passwordInput.value = '';
+      showApp();
     };
 
-    loginBtn.onclick = async () => {
-      const username = usernameInput.value.trim();
-      const password = passwordInput.value.trim();
-
-      if (!username || !password) {
-        alert("Please enter both a username and password.");
-        return;
-      }
-
-      try {
-        const res = await fetch(BACKEND_URL + '/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || "Login failed");
-          return;
-        }
-
-        currentUser = username;
-        usernameInput.value = '';
-        passwordInput.value = '';
-        showApp();
-      } catch (error) {
-        alert("Failed to login. Try again later.");
-        console.error(error);
-      }
-    };
-
+    // Logout
     logoutBtn.onclick = () => {
       currentUser = null;
       showLogin();
     };
 
-    messageForm.onsubmit = async (e) => {
+    // Send message handler
+    messageForm.onsubmit = (e) => {
       e.preventDefault();
       const text = messageText.value.trim();
       if (!text) return;
-
-      try {
-        const res = await fetch(BACKEND_URL + '/message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: currentUser, text })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || "Failed to send message");
-          return;
-        }
-
-        messageText.value = '';
-        if (currentUser === ADMIN) {
-          await renderMessages();
-        }
-      } catch (error) {
-        alert("Failed to send message. Try again later.");
-        console.error(error);
-      }
+      messages.push({ from: currentUser, text });
+      localStorage.setItem('messages', JSON.stringify(messages));
+      messageText.value = '';
+      renderMessages();
     };
 
-    async function renderMessages() {
-      try {
-        const res = await fetch(BACKEND_URL + '/messages');
-        if (!res.ok) throw new Error("Failed to load messages");
-
-        const data = await res.json();
-        messagesDiv.innerHTML = "<h3>All Messages</h3>" + data.map(m =>
-          `<p><strong>${m.from}:</strong> ${m.text}</p>`
-        ).join('');
-      } catch (error) {
-        console.error("Failed to fetch messages:", error);
-        messagesDiv.innerHTML = "<p style='color: red;'>Could not load messages.</p>";
-      }
-    }
-
+    // Show app view after login
     function showApp() {
       authSection.style.display = 'none';
       appSection.style.display = 'block';
       welcome.textContent = `Welcome, ${currentUser}!`;
+
       if (currentUser === ADMIN) {
         messagesDiv.style.display = 'block';
         renderMessages();
       } else {
+        // Hide messages for regular users
         messagesDiv.style.display = 'none';
       }
     }
 
+    // Show login view
     function showLogin() {
       appSection.style.display = 'none';
       authSection.style.display = 'block';
-      messagesDiv.style.display = 'none';
     }
 
+    // Render all messages (admin only)
+    function renderMessages() {
+      if (messages.length === 0) {
+        messagesDiv.innerHTML = "<p>No messages yet.</p>";
+        return;
+      }
+      messagesDiv.innerHTML = "<h3>All Messages</h3>" + messages.map(m => 
+        `<p><strong>${escapeHtml(m.from)}:</strong> ${escapeHtml(m.text)}</p>`
+      ).join('');
+    }
+
+    // Simple HTML escape to avoid injection
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // On page load, start with login
     showLogin();
   </script>
 </body>
