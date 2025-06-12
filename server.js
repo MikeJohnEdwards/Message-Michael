@@ -1,41 +1,52 @@
+// server.js
 const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-app.use(express.static('public'));
-app.use(express.json());
+app.use(cors());
+app.use(bodyParser.json());
 
-const users = {};
-const messages = [];
+const users = {};     // { username: base64encodedPassword }
+const messages = [];  // [{ from, text }]
 
+// Register new user
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
-  if (users[username]) return res.status(409).json({ error: 'User exists' });
+  if (users[username]) {
+    return res.status(400).json({ error: 'Username already taken' });
+  }
   users[username] = password;
-  res.json({ message: 'Registered successfully' });
+  res.json({ success: true });
 });
 
+// Login existing user
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  if (!users[username]) return res.status(404).json({ error: 'User not found' });
-  if (users[username] !== password) return res.status(401).json({ error: 'Wrong password' });
-  res.json({ message: 'Login success' });
+  if (!users[username] || users[username] !== password) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+  res.json({ success: true });
 });
 
-app.post('/messages', (req, res) => {
+// Send a message
+app.post('/message', (req, res) => {
   const { from, text } = req.body;
-  if (!from || !text) return res.status(400).json({ error: 'Missing fields' });
   messages.push({ from, text });
-  res.json({ message: 'Message stored' });
+  res.json({ success: true });
 });
 
+// Get all messages (admin only)
 app.get('/messages', (req, res) => {
-  const user = req.query.user;
-  if (user !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  const admin = req.query.admin;
+  if (admin !== 'admin') {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
   res.json(messages);
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
